@@ -1,0 +1,6 @@
+{
+  "name": "Ilmihal - Islamska Poduka & Vaktija",
+  "description": "Interaktivni digitalni ilmihal sa lekcijama, kvizovima, vaktijom, qibla kompasom i fokusom za namaz",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
