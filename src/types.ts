@@ -91,12 +91,16 @@ export interface SurahOrDua {
   id: string;
   title: string;
   subtitle: string;
-  category: 'namaska-dova' | 'kratka-sura' | 'svakodnevni-zikr';
+  category: 'namaska-dova' | 'kratka-sura' | 'asereta' | 'kuranske-dove' | 'svakodnevni-zikr' | 'jutarnji-zikr' | 'vecernji-zikr';
   arabic: string;
   transliteration: string;
   translation: string;
   benefits?: string;
   audioPromptText?: string;
+  audioUrl?: string;
+  audioUrls?: string[];
+  adhkarType?: 0 | 1 | 2;
+  order?: number;
 }
 
 export interface UserProgress {
