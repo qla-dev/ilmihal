@@ -1,0 +1,10 @@
+export const FULL_QURAN_TRANSLITERATIONS: Record<string, string> = {
+  'asereta-bekare': "Āmener-resūlu bimā unzile ilejhi mir-rabbihi vel-mu'minūn. Kullun āmene billāhi ve melāiketihi ve kutubihi ve rusulih. Lā nuferriku bejne ehadin min rusulih. Ve kālū semi'nā ve eta'nā, gufrāneke rabbenā ve ilejkel-masīr. Lā jukellifullāhu nefsen illā vus'ahā. Lehā mā kesebet ve alejha mektesebet. Rabbenā lā tuāhiznā in nesīnā ev ahta'nā. Rabbenā ve lā tahmil alejnā isran kemā hameltehu alellezīne min kablinā. Rabbenā ve lā tuhammilnā mā lā tākate lenā bih. Va'fu annā vagfir lenā verhamnā. Ente mevlānā fensurnā alel-kavmil-kāfirīn.",
+  'asereta-hasr-imena': "Huvallahu-llezi la ilahe illa huve, alimul-gajbi veš-šehade, huver-rahmanur-rahim. Huvallahu-llezi la ilahe illa huvel-melikul-kuddusu, es-selamu, el-mu'minu, el-muhejminu, el-azizu, el-džebbaru, el-mutekebbir. Subhanallahi amma jušrikun. Huvallahu-l-haliku, el-bariu, el-musavviru, lehul-esmaul-husna. Jusebbihu lehu ma fis-semavati vel-erdi, ve huvel-azizul-hakim.",
+  'asereta-kursi': "Allahu la ilahe illa huvel-hajjul-kajjum. La te'huzuhu sinetun ve la nevm. Lehu ma fis-semavati ve ma fil-erd. Men zellezi ješfe'u indehu illa bi iznih. Ja'lemu ma bejne ejdihim ve ma halfehum, ve la juhitune bi šej'in min ilmihi illa bima ša'. Vesi'a kursijjuhus-semavati vel-erd, ve la je'uduhu hifzuhuma, ve huvel-alijjul-azim.",
+  'asereta-imran': "Kulillahumme malikel-mulk, tu'til-mulke men teša'u ve tenzi'ul-mulke mimmen teša'u, ve tu'izzu men teša'u ve tuzillu men teša'u. Bi jedikel-hajr, inneke ala kulli šej'in kadir. Tulidžul-lejle fin-nehari ve tulidžun-nehare fil-lejl, ve tuhridžul-hajje minel-mejjiti ve tuhridžul-mejjite minel-hajj, ve terzuku men teša'u bigajri hisab."
+  , 'adijat': "Vel-adijati dabha. Fel-murijati kadha. Fel-mugirati subha. Fe eserne bihi nak'a. Fe vesatne bihi džem'a. Innel-insane li rabbihi lekenud. Ve innehu ala zalike lešehid. Ve innehu lihubbil-hajri lešedid. E fela ja'lemu iza bu'sire ma fil-kubur. Ve hussile ma fis-sudur. Inne rabbehum bihim jevmeizin lehabir."
+};
+
+export const toBosnianPronunciation = (text: string) => text
+  .replace(/[’‘]/g, "'");

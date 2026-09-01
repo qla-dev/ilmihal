@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   BookMarked, 
   Volume2, 
@@ -8,40 +8,133 @@ import {
   Sparkles, 
   Heart, 
   Share2,
-  Search
+  Search,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { SURAHS_AND_DUAS } from '../data/surahsAndDuas';
+import { ADHKAR_JSON_AUDIO_BY_DATASET_ENTRY } from '../data/adhkarJsonAudioMapping';
 import { SurahOrDua } from '../types';
 import { soundService } from '../utils/soundAndSpeech';
+
+const ADHKAR_DATASET_URL = 'https://raw.githubusercontent.com/Seen-Arabic/Morning-And-Evening-Adhkar-DB/main/en.json';
+
+interface DatasetAdhkar {
+  order: number;
+  content: string;
+  translation: string;
+  transliteration: string;
+  count: number;
+  count_description: string;
+  fadl: string;
+  source: string;
+  type: 0 | 1 | 2;
+  audio?: string;
+}
 
 export const SurahsAndDuasView: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [datasetAdhkar, setDatasetAdhkar] = useState<SurahOrDua[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const filteredItems = SURAHS_AND_DUAS.filter(item => {
-    const matchesCat = activeCategory === 'all' || item.category === activeCategory;
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetch(ADHKAR_DATASET_URL, { signal: controller.signal })
+      .then(response => {
+        if (!response.ok) throw new Error('Dataset nije dostupan');
+        return response.json() as Promise<DatasetAdhkar[]>;
+      })
+      .then(items => {
+        setDatasetAdhkar(items.map(item => {
+          const adhkarJsonAudioUrl = ADHKAR_JSON_AUDIO_BY_DATASET_ENTRY.get(`${item.order}-${item.type}`);
+
+          return {
+          id: `dataset-adhkar-${item.order}-${item.type}`,
+          title: `Zikr ${item.order}`,
+          subtitle: `${item.count_description} • ${item.type === 1 ? 'jutarnji' : item.type === 2 ? 'večernji' : 'jutarnji i večernji'}`,
+          category: 'svakodnevni-zikr',
+          arabic: item.content,
+          transliteration: item.transliteration,
+          translation: item.translation,
+          benefits: [item.fadl, item.source].filter(Boolean).join(' Izvor: '),
+          audioUrl: adhkarJsonAudioUrl,
+          adhkarType: item.type,
+          order: item.order
+          };
+        }));
+      })
+      .catch(error => {
+        if (error.name !== 'AbortError') console.warn('Jutarnji i večernji zikr nisu učitani.', error);
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  // The locally curated set contains 13 core morning and 14 core evening adhkar,
+  // with Bosnian translations and pronunciation. The remote English dataset is
+  // intentionally not shown.
+  const visibleItems = SURAHS_AND_DUAS;
+
+  const filteredItems = visibleItems.filter(item => {
+    const matchesCat = activeCategory === 'all' ||
+      (activeCategory === 'jutarnji-zikr' && (item.category === 'jutarnji-zikr' || item.adhkarType === 0 || item.adhkarType === 1)) ||
+      (activeCategory === 'vecernji-zikr' && (item.category === 'vecernji-zikr' || item.adhkarType === 0 || item.adhkarType === 2)) ||
+      (activeCategory !== 'jutarnji-zikr' && activeCategory !== 'vecernji-zikr' && !item.adhkarType && item.category === activeCategory);
     const matchesSearch = 
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.transliteration.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.translation.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCat && matchesSearch;
+  }).sort((a, b) => {
+    const orderFor = (item: SurahOrDua) => item.id === 'zikr-tesbih' ? 30 : (item.order ?? 0);
+    return orderFor(a) - orderFor(b);
   });
 
   const handlePlayAudio = (item: SurahOrDua) => {
     if (playingId === item.id) {
+      audioRef.current?.pause();
+      audioRef.current = null;
       soundService.stopSpeech();
       setPlayingId(null);
     } else {
+      audioRef.current?.pause();
       soundService.stopSpeech();
       setPlayingId(item.id);
-      // Speak Arabic
-      soundService.speak(item.arabic, 'ar-SA', 0.82);
-      // Auto cancel state after duration estimate
-      setTimeout(() => {
-        setPlayingId(null);
-      }, 12000);
+
+      const audioUrls = item.audioUrls ?? (item.audioUrl ? [item.audioUrl] : []);
+      const fallbackToSpeech = () => {
+        soundService.speak(item.arabic, 'ar-SA', 0.82, () => setPlayingId(null));
+      };
+
+      if (!audioUrls.length) {
+        fallbackToSpeech();
+        return;
+      }
+
+      const playTrack = (index: number) => {
+        const audio = new Audio(audioUrls[index]);
+        audioRef.current = audio;
+        audio.onended = () => {
+          if (index + 1 < audioUrls.length) {
+            playTrack(index + 1);
+          } else {
+            audioRef.current = null;
+            setPlayingId(null);
+          }
+        };
+        audio.onerror = () => {
+          audioRef.current = null;
+          fallbackToSpeech();
+        };
+        audio.play().catch(fallbackToSpeech);
+      };
+
+      playTrack(0);
     }
   };
 
@@ -93,7 +186,7 @@ export const SurahsAndDuasView: React.FC = () => {
               : 'bg-white text-[#636B69] hover:text-[#2C3333] border border-[#E2E1D9]'
           }`}
         >
-          Sve ({SURAHS_AND_DUAS.length})
+          Sve ({visibleItems.length})
         </button>
         <button
           onClick={() => {
@@ -124,6 +217,32 @@ export const SurahsAndDuasView: React.FC = () => {
         <button
           onClick={() => {
             soundService.playClick();
+            setActiveCategory('asereta');
+          }}
+          className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-colors whitespace-nowrap shadow-xs ${
+            activeCategory === 'asereta'
+              ? 'bg-[#16302B] text-white border border-[#16302B]'
+              : 'bg-white text-[#636B69] hover:text-[#2C3333] border border-[#E2E1D9]'
+          }`}
+        >
+          Ašareta
+        </button>
+        <button
+          onClick={() => {
+            soundService.playClick();
+            setActiveCategory('kuranske-dove');
+          }}
+          className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-colors whitespace-nowrap shadow-xs ${
+            activeCategory === 'kuranske-dove'
+              ? 'bg-[#16302B] text-white border border-[#16302B]'
+              : 'bg-white text-[#636B69] hover:text-[#2C3333] border border-[#E2E1D9]'
+          }`}
+        >
+          Kur'anske Dove
+        </button>
+        <button
+          onClick={() => {
+            soundService.playClick();
             setActiveCategory('svakodnevni-zikr');
           }}
           className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-colors whitespace-nowrap shadow-xs ${
@@ -134,6 +253,32 @@ export const SurahsAndDuasView: React.FC = () => {
         >
           Zikrovi
         </button>
+        <button
+          onClick={() => {
+            soundService.playClick();
+            setActiveCategory('jutarnji-zikr');
+          }}
+          className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-colors whitespace-nowrap shadow-xs ${
+            activeCategory === 'jutarnji-zikr'
+              ? 'bg-[#16302B] text-white border border-[#16302B]'
+              : 'bg-white text-[#636B69] hover:text-[#2C3333] border border-[#E2E1D9]'
+          }`}
+        >
+          Jutarnji Zikr
+        </button>
+        <button
+          onClick={() => {
+            soundService.playClick();
+            setActiveCategory('vecernji-zikr');
+          }}
+          className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-colors whitespace-nowrap shadow-xs ${
+            activeCategory === 'vecernji-zikr'
+              ? 'bg-[#16302B] text-white border border-[#16302B]'
+              : 'bg-white text-[#636B69] hover:text-[#2C3333] border border-[#E2E1D9]'
+          }`}
+        >
+          Večernji Zikr
+        </button>
       </div>
 
       {/* List of Surahs & Duas */}
@@ -141,6 +286,9 @@ export const SurahsAndDuasView: React.FC = () => {
         {filteredItems.map(item => {
           const isPlaying = playingId === item.id;
           const isCopied = copiedId === item.id;
+          const hasAudio = Boolean(item.audioUrl || item.audioUrls?.length);
+          const showAudioControl = item.adhkarType === undefined || hasAudio;
+          const isCollapsed = collapsedIds.has(item.id);
 
           return (
             <div
@@ -157,17 +305,31 @@ export const SurahsAndDuasView: React.FC = () => {
 
                 <div className="flex items-center space-x-1.5">
                   <button
-                    onClick={() => handlePlayAudio(item)}
-                    title={isPlaying ? 'Zaustavi učenje' : 'Preslušaj izgovor'}
-                    className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                      isPlaying
-                        ? 'bg-[#C29B38] text-[#16302B] animate-pulse'
-                        : 'bg-[#FAF9F5] hover:bg-[#F5F4F0] text-[#16302B] border border-[#E2E1D9]'
-                    }`}
+                    onClick={() => setCollapsedIds(current => {
+                      const next = new Set(current);
+                      if (next.has(item.id)) next.delete(item.id);
+                      else next.add(item.id);
+                      return next;
+                    })}
+                    title={isCollapsed ? 'Prikaži sadržaj' : 'Sakrij sadržaj'}
+                    className="p-1.5 rounded-lg bg-[#FAF9F5] hover:bg-[#F5F4F0] text-[#636B69] border border-[#E2E1D9]"
                   >
-                    {isPlaying ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-[#B58D3D]" />}
-                    <span>{isPlaying ? 'Zaustavi' : 'Učenje'}</span>
+                    {isCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
                   </button>
+                  {showAudioControl && (
+                    <button
+                      onClick={() => handlePlayAudio(item)}
+                      title={isPlaying ? 'Zaustavi učenje' : 'Preslušaj izgovor'}
+                      className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                        isPlaying
+                          ? 'bg-[#C29B38] text-[#16302B] animate-pulse'
+                          : 'bg-[#FAF9F5] hover:bg-[#F5F4F0] text-[#16302B] border border-[#E2E1D9]'
+                      }`}
+                    >
+                      {isPlaying ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-[#B58D3D]" />}
+                      <span>{isPlaying ? 'Zaustavi' : 'Učenje'}</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => handleCopy(item)}
@@ -179,6 +341,7 @@ export const SurahsAndDuasView: React.FC = () => {
                 </div>
               </div>
 
+              {!isCollapsed && <>
               {/* Arabic text */}
               <div className="p-3 bg-[#FAF9F5] rounded-xl border border-[#E2E1D9] text-right">
                 <p className="font-arabic text-2xl text-[#16302B] leading-loose font-bold" dir="rtl">
@@ -199,7 +362,7 @@ export const SurahsAndDuasView: React.FC = () => {
               {/* Translation */}
               <div className="space-y-1">
                 <span className="text-[10px] uppercase tracking-wider font-bold text-[#636B69]">
-                  Prijevod na bosanski:
+                  Prijevod:
                 </span>
                 <p className="text-xs text-[#4A5351] italic leading-relaxed font-medium">
                   {item.translation}
@@ -211,6 +374,7 @@ export const SurahsAndDuasView: React.FC = () => {
                   ✨ <strong>Vrijednost:</strong> {item.benefits}
                 </p>
               )}
+              </>}
             </div>
           );
         })}

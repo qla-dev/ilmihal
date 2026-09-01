@@ -1,0 +1,38 @@
+[
+  {
+    "audioFile": "77.mp3",
+    "morning": { "order": 7, "type": 1, "textStart": "أصبحنا وأصبح الملك لله" },
+    "evening": { "order": 8, "type": 2, "textStart": "أمسينا وأمسى الملك لله" },
+    "status": "shared_source_audio_needs_separate_recordings"
+  },
+  {
+    "audioFile": "78.mp3",
+    "morning": { "order": 9, "type": 1, "textStart": "اللهم بك أصبحنا" },
+    "evening": { "order": 10, "type": 2, "textStart": "اللهم بك أمسينا" },
+    "status": "shared_source_audio_needs_separate_recordings"
+  },
+  {
+    "audioFile": "80.mp3",
+    "morning": { "order": 12, "type": 1, "textStart": "اللهم إني أصبحت أشهدك" },
+    "evening": { "order": 13, "type": 2, "textStart": "اللهم إني أمسيت أشهدك" },
+    "status": "shared_source_audio_needs_separate_recordings"
+  },
+  {
+    "audioFile": "81.mp3",
+    "morning": { "order": 14, "type": 1, "textStart": "اللهم ما أصبح بي من نعمة" },
+    "evening": { "order": 15, "type": 2, "textStart": "اللهم ما أمسى بي من نعمة" },
+    "status": "shared_source_audio_needs_separate_recordings"
+  },
+  {
+    "audioFile": "89.mp3",
+    "morning": { "order": 23, "type": 1, "textStart": "أصبحنا وأصبح الملك لله رب العالمين" },
+    "evening": { "order": 24, "type": 2, "textStart": "أمسينا وأمسى الملك لله رب العالمين" },
+    "status": "shared_source_audio_needs_separate_recordings"
+  },
+  {
+    "audioFile": "90.mp3",
+    "morning": { "order": 25, "type": 1, "textStart": "أصبحنا على فطرة الإسلام" },
+    "evening": { "order": 26, "type": 2, "textStart": "أمسينا على فطرة الإسلام" },
+    "status": "shared_source_audio_needs_separate_recordings"
+  }
+]
