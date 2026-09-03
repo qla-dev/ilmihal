@@ -5,6 +5,9 @@ class SoundService {
   private ambientGain: GainNode | null = null;
   private ambientSources: AudioNode[] = [];
   private isAmbientPlaying = false;
+  private currentAudio: HTMLAudioElement | null = null;
+  private playbackToken = 0;
+  private resolvePlayback: ((result: 'ended' | 'cancelled' | 'error') => void) | null = null;
 
   private getAudioContext(): AudioContext | null {
     if (typeof window === 'undefined') return null;
@@ -277,6 +280,169 @@ class SoundService {
     } catch {
       if (onEnd) onEnd();
     }
+  }
+
+  speakAsync(
+    text: string,
+    lang: string = 'ar-SA',
+    rate: number = 0.85,
+    onState?: (state: 'loading' | 'playing' | 'idle' | 'error') => void,
+  ): Promise<'ended' | 'cancelled' | 'error'> {
+    this.stopPlayback();
+    const token = this.playbackToken;
+    if (!text.trim()) return Promise.resolve('ended');
+    onState?.('loading');
+
+    return new Promise(resolve => {
+      this.resolvePlayback = resolve;
+      try {
+        if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+          onState?.('error');
+          resolve('error');
+          return;
+        }
+        // Keep this directly inside the Listen/Start call chain. Deferring a
+        // speech request can make mobile browsers reject it as non-user input.
+        window.speechSynthesis.resume();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = lang;
+        utterance.rate = rate;
+        utterance.pitch = 1;
+        const voices = window.speechSynthesis.getVoices();
+        const voice = voices.find(item => lang.startsWith('ar')
+          // Some installed Arabic voices report a non-Arabic locale but carry
+          // “Arabic” in their voice name. This was supported by the original
+          // working web player and must remain supported.
+          ? item.lang.toLowerCase().startsWith('ar') || item.lang.includes('AR') || item.name.toLowerCase().includes('arabic')
+          : item.lang.toLowerCase().startsWith('bs') || item.lang.toLowerCase().startsWith('hr'));
+        if (voice) utterance.voice = voice;
+        utterance.onstart = () => {
+          if (token === this.playbackToken) onState?.('playing');
+        };
+        utterance.onend = () => {
+          if (token !== this.playbackToken) {
+            resolve('cancelled');
+            return;
+          }
+          onState?.('idle');
+          this.resolvePlayback = null;
+          resolve('ended');
+        };
+        utterance.onerror = () => {
+          if (token !== this.playbackToken) {
+            resolve('cancelled');
+            return;
+          }
+          onState?.('error');
+          this.resolvePlayback = null;
+          resolve('error');
+        };
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        onState?.('error');
+        this.resolvePlayback = null;
+        resolve('error');
+      }
+    });
+  }
+
+  /**
+   * Prayer recitations deliberately pass only Arabic glyphs to the Arabic voice.
+   * This keeps Bosnian instructions/transliteration out of the recitation channel.
+   */
+  speakArabicRecitation(
+    text: string,
+    onState?: (state: 'loading' | 'playing' | 'idle' | 'error') => void,
+  ) {
+    const arabicOnly = text.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]+/g)?.join(' ') ?? '';
+    if (!arabicOnly) return Promise.resolve('error' as const);
+
+    // Use the original, proven web speech path for Arabic. The guided player
+    // adds completion tracking around it but must not replace its voice setup.
+    onState?.('loading');
+    return new Promise<'ended' | 'cancelled' | 'error'>(resolve => {
+      this.speak(
+        arabicOnly,
+        'ar-SA',
+        0.82,
+        () => { onState?.('idle'); resolve('ended'); },
+        () => onState?.('playing'),
+      );
+    });
+  }
+
+  playAudioUrls(
+    urls: string[],
+    onState?: (state: 'loading' | 'playing' | 'idle' | 'error') => void,
+  ): Promise<'ended' | 'cancelled' | 'error'> {
+    this.stopPlayback();
+    const token = this.playbackToken;
+    if (!urls.length) return Promise.resolve('error');
+    onState?.('loading');
+
+    return new Promise(resolve => {
+      this.resolvePlayback = resolve;
+      let index = 0;
+      let failures = 0;
+      const finish = (result: 'ended' | 'cancelled' | 'error') => {
+        if (token === this.playbackToken) {
+          this.currentAudio = null;
+          this.resolvePlayback = null;
+          onState?.(result === 'error' ? 'error' : 'idle');
+        }
+        resolve(result);
+      };
+      const playNext = () => {
+        if (token !== this.playbackToken) {
+          finish('cancelled');
+          return;
+        }
+        if (index >= urls.length) {
+          finish(failures === urls.length ? 'error' : 'ended');
+          return;
+        }
+        const audio = new Audio(urls[index]);
+        let trackSettled = false;
+        this.currentAudio = audio;
+        audio.preload = 'auto';
+        audio.onplaying = () => token === this.playbackToken && onState?.('playing');
+        audio.onended = () => {
+          if (trackSettled) return;
+          trackSettled = true;
+          index += 1;
+          playNext();
+        };
+        audio.onerror = () => {
+          if (trackSettled) return;
+          trackSettled = true;
+          failures += 1;
+          index += 1;
+          playNext();
+        };
+        audio.play().catch(() => {
+          if (trackSettled) return;
+          trackSettled = true;
+          failures += 1;
+          index += 1;
+          playNext();
+        });
+      };
+      playNext();
+    });
+  }
+
+  stopPlayback() {
+    const pending = this.resolvePlayback;
+    this.resolvePlayback = null;
+    this.playbackToken += 1;
+    if (this.currentAudio) {
+      this.currentAudio.pause();
+      this.currentAudio.removeAttribute('src');
+      this.currentAudio.load();
+      this.currentAudio = null;
+    }
+    this.stopSpeech();
+    pending?.('cancelled');
   }
 
   stopSpeech() {

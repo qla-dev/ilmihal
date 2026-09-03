@@ -39,7 +39,12 @@ export const SurahsAndDuasView: React.FC = () => {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [datasetAdhkar, setDatasetAdhkar] = useState<SurahOrDua[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playbackRequest = useRef(0);
+
+  useEffect(() => () => {
+    playbackRequest.current += 1;
+    soundService.stopPlayback();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -95,46 +100,24 @@ export const SurahsAndDuasView: React.FC = () => {
     return orderFor(a) - orderFor(b);
   });
 
-  const handlePlayAudio = (item: SurahOrDua) => {
+  const handlePlayAudio = async (item: SurahOrDua) => {
     if (playingId === item.id) {
-      audioRef.current?.pause();
-      audioRef.current = null;
-      soundService.stopSpeech();
+      playbackRequest.current += 1;
+      soundService.stopPlayback();
       setPlayingId(null);
     } else {
-      audioRef.current?.pause();
-      soundService.stopSpeech();
+      const request = ++playbackRequest.current;
+      soundService.stopPlayback();
       setPlayingId(item.id);
 
       const audioUrls = item.audioUrls ?? (item.audioUrl ? [item.audioUrl] : []);
-      const fallbackToSpeech = () => {
-        soundService.speak(item.arabic, 'ar-SA', 0.82, () => setPlayingId(null));
-      };
-
-      if (!audioUrls.length) {
-        fallbackToSpeech();
-        return;
+      let result = audioUrls.length
+        ? await soundService.playAudioUrls(audioUrls)
+        : 'error';
+      if (result === 'error' && request === playbackRequest.current) {
+        result = await soundService.speakArabicRecitation(item.arabic);
       }
-
-      const playTrack = (index: number) => {
-        const audio = new Audio(audioUrls[index]);
-        audioRef.current = audio;
-        audio.onended = () => {
-          if (index + 1 < audioUrls.length) {
-            playTrack(index + 1);
-          } else {
-            audioRef.current = null;
-            setPlayingId(null);
-          }
-        };
-        audio.onerror = () => {
-          audioRef.current = null;
-          fallbackToSpeech();
-        };
-        audio.play().catch(fallbackToSpeech);
-      };
-
-      playTrack(0);
+      if (result !== 'cancelled' && request === playbackRequest.current) setPlayingId(null);
     }
   };
 
@@ -318,7 +301,7 @@ export const SurahsAndDuasView: React.FC = () => {
                   </button>
                   {showAudioControl && (
                     <button
-                      onClick={() => handlePlayAudio(item)}
+                      onClick={() => void handlePlayAudio(item)}
                       title={isPlaying ? 'Zaustavi učenje' : 'Preslušaj izgovor'}
                       className={`flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
                         isPlaying
