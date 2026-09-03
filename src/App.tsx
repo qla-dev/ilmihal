@@ -104,6 +104,14 @@ export default function App() {
     });
   };
 
+  // Guided prayer completion is idempotent; it must never uncheck an already-recorded prayer.
+  const handleRecordPrayed = (prayerKey: string) => {
+    updateProgress(prev => ({
+      ...prev,
+      prayedToday: { ...prev.prayedToday, [prayerKey]: true }
+    }));
+  };
+
   // Quiz score save
   const handleSaveQuizScore = (quizId: string, score: number, total: number) => {
     updateProgress(prev => ({
@@ -219,7 +227,7 @@ export default function App() {
           <NamazModeModal
             initialPrayerName={focusPrayerName}
             onClose={() => setActiveTab('vaktija')}
-            onRecordPrayer={handleTogglePrayed}
+            onRecordPrayer={handleRecordPrayed}
           />
         )}
 
@@ -260,7 +268,7 @@ export default function App() {
         <NamazModeModal
           initialPrayerName={focusPrayerName}
           onClose={() => setIsFocusModeOpen(false)}
-          onRecordPrayer={handleTogglePrayed}
+          onRecordPrayer={handleRecordPrayed}
         />
       )}
 
